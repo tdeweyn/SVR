@@ -20,56 +20,6 @@ def Calculate_Average_Voltage(x):
     Average_Voltage = sum(x)/len(x)
     return Average_Voltage
 
-try:
-    # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
-    arduino = serial.Serial("COM3", 115200, timeout=1)  
-except:
-    print('Please check the port')
-
-#plt.ion() # animated plot
-fig = plt.gcf()
-fig.show()
-fig.canvas.draw()
-
-ydata = [0] * 50
-ax1 = plt.axes()
-
-# make plot
-line, = plt.plot(ydata)
-plt.ylim([10,40])
-ymin = 0
-ymax = 5
-plt.ylim([ymin,ymax])
-
-# Check if serial read is outputting actual data before commencing actual plotting
-testdata = 10.0
-dummydata = arduino.readline()
-data = dummydata.rstrip()
-while Is_Number(data) != True:
-        dummydata = arduino.readline()
-        data = dummydata.rstrip()
-data = float(data) * (5.0 / 1023.0)
-ydata.append(data)
-del ydata[0]
-line.set_xdata(np.arange(len(ydata)))
-line.set_ydata(ydata)  # update the data
-fig.canvas.draw() # update the plot
-
-# start data collection
-while True:
-    dummydata = arduino.readline()
-    #data = arduino.readline().rstrip()
-    data = dummydata.rstrip()
-    while Is_Number(data) != True:
-        dummydata = arduino.readline()
-        data = dummydata.rstrip()
-    data = float(data) * (5.0 / 1023.0)
-    ydata.append(data)
-    del ydata[0]
-    line.set_xdata(np.arange(len(ydata)))
-    line.set_ydata(ydata)  # update the data
-    fig.canvas.draw() # update the plot
-
 # Plotting currently based on rlabbe/real_time_plotting.py
 # It does not work well since it freezes if you move the window.  Fix this
 
@@ -97,3 +47,41 @@ while True:
 #     file.close()
 # 
 # write(cleandata)
+
+def main():
+    try:
+        # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
+        arduino = serial.Serial("COM3", 115200, timeout=1)  
+    except:
+        print('Please check the port')
+    
+    fig = plt.gcf()
+    fig.show()
+    fig.canvas.draw()
+    
+    ydata = [0] * 100
+    ax1 = plt.axes()
+    
+    # make plot
+    line, = plt.plot(ydata)
+    plt.ylim([10,40])
+    ymin = 0
+    ymax = 5
+    plt.ylim([ymin,ymax])
+    
+    # start data collection
+    while True:
+        dummydata = arduino.readline()      # Debug variable to see serial data sent
+        data = dummydata.rstrip()
+        while Is_Number(data) != True:      # Necessary to check since first serial data sent is not always valid
+            dummydata = arduino.readline()
+            data = dummydata.rstrip()
+        data = float(data) * (5.0 / 1023.0)
+        ydata.append(data)
+        del ydata[0]
+        line.set_xdata(np.arange(len(ydata)))
+        line.set_ydata(ydata)  # update the data
+        fig.canvas.draw() # update the plot
+    
+if __name__ == "__main__":
+    main()
