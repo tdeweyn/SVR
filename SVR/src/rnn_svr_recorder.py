@@ -2,6 +2,7 @@
 Created on Jan 7, 2018
 
 @author: James
+So what needs to be done: need
 '''
 
 import serial
@@ -19,9 +20,6 @@ def Is_Number(x):
 def Calculate_Average_Voltage(x):
     Average_Voltage = sum(x)/len(x)
     return Average_Voltage
-
-# Plotting currently based on rlabbe/real_time_plotting.py
-# It does not work well since it freezes if you move the window.  Fix this
 
 # rawdata = []
 # count = 0
@@ -59,7 +57,7 @@ def main():
     fig.show()
     fig.canvas.draw()
     
-    ydata = [0] * 100
+    ydata = [0] * 1000
     ax1 = plt.axes()
     
     # make plot
@@ -69,6 +67,8 @@ def main():
     ymax = 5
     plt.ylim([ymin,ymax])
     
+    # Plotting currently based on rlabbe/real_time_plotting.py
+    # It does not work well since it freezes if you touch the window.  Fix this
     # start data collection
     while True:
         dummydata = arduino.readline()      # Debug variable to see serial data sent
