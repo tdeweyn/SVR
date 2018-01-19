@@ -8,13 +8,24 @@ import serial
 import numpy as np
 from matplotlib import pyplot as plt
 
+def Is_Number(x):
+    try:
+        float(x)
+        return True
+    except ValueError:
+        return False
+
 try:
     # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
     arduino = serial.Serial("COM3", 115200, timeout=1)  
 except:
     print('Please check the port')
 
-plt.ion() # animated plot
+#plt.ion() # animated plot
+fig = plt.gcf()
+fig.show()
+fig.canvas.draw()
+
 ydata = [0] * 50
 ax1 = plt.axes()
 
@@ -25,20 +36,34 @@ ymin = 0
 ymax = 5
 plt.ylim([ymin,ymax])
 
+# Check if serial read is outputting actual data before commencing actual plotting
+testdata = 10.0
+dummydata = arduino.readline()
+data = dummydata.rstrip()
+while Is_Number(data) != True:
+        dummydata = arduino.readline()
+        data = dummydata.rstrip()
+data = float(data) * (5.0 / 1023.0)
+ydata.append(data)
+del ydata[0]
+line.set_xdata(np.arange(len(ydata)))
+line.set_ydata(ydata)  # update the data
+fig.canvas.draw() # update the plot
+
 # start data collection
-while True:  
-    data = arduino.readline().rstrip()  # read data from serial 
-                                        # port and strip line endings
-    #if len(data.split(".")) == 2:
-    #ymin = float(min(ydata))-10.0
-    #ymax = float(max(ydata))+10.0
-    #plt.ylim([ymin,ymax])
+while True:
+    dummydata = arduino.readline()
+    #data = arduino.readline().rstrip()
+    data = dummydata.rstrip()
+    while Is_Number(data) != True:
+        dummydata = arduino.readline()
+        data = dummydata.rstrip()
+    data = float(data) * (5.0 / 1023.0)
     ydata.append(data)
     del ydata[0]
     line.set_xdata(np.arange(len(ydata)))
     line.set_ydata(ydata)  # update the data
-    plt.draw() # update the plot
-    plt.pause(1)
+    fig.canvas.draw() # update the plot
 
 # rawdata = []
 # count = 0
@@ -65,10 +90,6 @@ while True:
 # 
 # write(cleandata)
 
-# test test
-
-#while True:
- #   print(str(arduino.readline()))
 
 #if __name__ == '__main__':
 #    print('This program is being run by itself')
