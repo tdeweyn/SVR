@@ -6,6 +6,7 @@ Created on Jan 7, 2018
 
 import serial
 import numpy as np
+import datetime
 from matplotlib import pyplot as plt
 
 def Is_Number(x):
@@ -14,6 +15,10 @@ def Is_Number(x):
         return True
     except ValueError:
         return False
+    
+def Calculate_Average_Voltage(x):
+    Average_Voltage = sum(x)/len(x)
+    return Average_Voltage
 
 try:
     # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
@@ -65,6 +70,9 @@ while True:
     line.set_ydata(ydata)  # update the data
     fig.canvas.draw() # update the plot
 
+# Plotting currently based on rlabbe/real_time_plotting.py
+# It does not work well since it freezes if you move the window.  Fix this
+
 # rawdata = []
 # count = 0
 # 
@@ -89,9 +97,3 @@ while True:
 #     file.close()
 # 
 # write(cleandata)
-
-
-#if __name__ == '__main__':
-#    print('This program is being run by itself')
-#else:
-#    print('Imported from another module')
