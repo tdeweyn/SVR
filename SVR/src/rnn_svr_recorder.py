@@ -4,6 +4,7 @@ Created on Jan 7, 2018
 @author: James
 So what needs to be done: need graph fixed, csv to wav, and do the RNN tutorial.
 '''
+# Rants to make me feel better
 # I swear I'm gonna go back to a C type language if I see another poorly documented python library.
 # Honestly anything with better documentation like JS and php.net.
 
@@ -26,6 +27,8 @@ import serial
 from matplotlib import pyplot as plt
 
 ydata = [0] * 100
+average_Voltage = 0;
+
 try:
     # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
     arduino = serial.Serial("COM3", 115200, timeout=1)
@@ -33,7 +36,8 @@ except:
     print('Please check the port')
     sys.exit(1)
 
-
+# Freezing graph fix from
+# https://stackoverflow.com/questions/9999816/matplotlib-draw-freezes-window
 class App():
     def __init__(self):
         
@@ -44,10 +48,14 @@ class App():
         self.fig = plt.figure()                 # creates figure instance
         self.ax = self.fig.add_subplot(111)
         self.ax.set_xlabel('X')         # adds axes labels, can't see them for some reason
-        self.ax.set_ylabel('Y')
-        self.ymin = 0
-        self.ymax = 5
-        self.ax.set_ylim([self.ymin,self.ymax])
+        self.ax.set_ylabel('Voltage')
+        
+        global average_Voltage
+        average_Voltage = Calibration_Zero_Average()
+        ymin = 0 - average_Voltage
+        ymax = 5 - average_Voltage
+        self.ax.set_ylim([ymin,ymax])
+        self.ax.grid
         self.fig = function1(self.fig, self.ax)     # fills figure with data
         
             
@@ -77,28 +85,59 @@ class App():
 
 def function1(fig, ax):
     ax.cla()                                                            # Clear current axes
+    ax.set_xlabel('X')         # Need to set them again
+    ax.set_ylabel('Voltage')
     dummydata = arduino.readline()      # Debug variable to see serial data sent
     data = dummydata.rstrip()
     while Is_Number(data) != True:      # Necessary to check since first serial data sent is not always valid
         dummydata = arduino.readline()
         data = dummydata.rstrip()
-    data = float(data) * (5.0 / 1023.0)
+    data = float(data) * (5.0 / 1023.0) - average_Voltage
     global ydata
     ydata.append(data)
     del ydata[0]
     ax.plot(ydata)
     return fig
 
+####################
+#    Is_Number
+#    Self explanatory
+#    Return: Float
+####################
 def Is_Number(x):
     try:
         float(x)
         return True
     except ValueError:
         return False
-    
+
+####################
+#    Calculate_Average_Voltage
+#    Self explanatory
+#    Return: Float
+####################
 def Calculate_Average_Voltage(x):
     Average_Voltage = sum(x)/len(x)
     return Average_Voltage
+
+####################
+#    Calibration_Zero_Average
+#    Calculates the average voltage of 1000 samples, zeroes the voltage
+#    to that average.
+#    Return: Float
+####################
+def Calibration_Zero_Average():
+    dataArray = [0] * 1000
+    for x in range(0,1000):
+        dummydata = arduino.readline()      # Debug variable to see serial data sent
+        data = dummydata.rstrip()
+        while Is_Number(data) != True:      # Necessary to check since first serial data sent is not always valid
+            dummydata = arduino.readline()
+            data = dummydata.rstrip()
+        data = float(data) * (5.0 / 1023.0)
+        dataArray[x] = data
+    return Calculate_Average_Voltage(dataArray)
+    
 
 # rawdata = []
 # count = 0
