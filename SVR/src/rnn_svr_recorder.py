@@ -1,8 +1,12 @@
 '''
 Created on Jan 7, 2018
-
+To do list:
+function to convert waveform to wav
+UI to start and stop recording of real time SVR
+UI to type in what was said
+LSTM-RNN
+Fix arduino not soft resetting when program connects
 @author: James
-So what needs to be done: need graph fixed, csv to wav, and do the RNN tutorial.
 '''
 # Rants to make me feel better
 # I swear I'm gonna go back to a C type language if I see another poorly documented python library.
@@ -22,6 +26,7 @@ import time
 from datetime import datetime
 import tkinter as tk        # tkinter is for python 3, Tkinter is for python 2.  Change if necessary
                             # Seriously, how is this a thing?
+from tkinter import messagebox
 
 import serial
 from matplotlib import pyplot as plt
@@ -31,7 +36,7 @@ average_Voltage = 0;
 
 try:
     # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
-    arduino = serial.Serial("COM3", 115200, timeout=1)
+    arduino = serial.Serial("COM3", 115200, timeout=3)
 except:
     print('Please check the port')
     sys.exit(1)
@@ -69,6 +74,8 @@ class App():
         self.label = tk.Label(text="")      # Makes empty label
         self.label.pack()                   # Adds it to the UI above the toolbar
         self.update_clock()                 # Calls clock update function
+        
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing())
         self.root.mainloop()                # UI loop that blocks
                                             # Subsitute of following
                                             # while True:
@@ -82,6 +89,11 @@ class App():
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         self.label.configure(text=now)              # Updates time text
         self.root.after(10, self.update_clock)      # after 10ms, it runs update_clock again because it's now part of the mainloop update cycle
+        
+    def on_closing(self):
+        if messagebox.askokcancel("Quit", "Do you want to quit?"):
+            arduino.close()
+            self.root.destroy()  
 
 def function1(fig, ax):
     ax.cla()                                                            # Clear current axes
@@ -137,7 +149,8 @@ def Calibration_Zero_Average():
         data = float(data) * (5.0 / 1023.0)
         dataArray[x] = data
     return Calculate_Average_Voltage(dataArray)
-    
+ 
+ 
 
 # rawdata = []
 # count = 0
