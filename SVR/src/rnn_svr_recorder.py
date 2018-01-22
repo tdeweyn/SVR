@@ -5,7 +5,8 @@ function to convert waveform to wav
 UI to start and stop recording of real time SVR
 UI to type in what was said
 LSTM-RNN
-Fix arduino not soft resetting when program connects
+Fix arduino not soft resetting when program connects: Use the IDE close, not
+the windows close button)
 @author: James
 '''
 # Rants to make me feel better
@@ -17,7 +18,6 @@ matplotlib.use('TkAgg')
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 from matplotlib.figure import Figure
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import random
 import numpy as np
@@ -44,10 +44,10 @@ except:
 # Freezing graph fix from
 # https://stackoverflow.com/questions/9999816/matplotlib-draw-freezes-window
 class App():
-    def __init__(self):
+    def __init__(self, master_root):
         
         
-        self.root = tk.Tk()                     # instantiate tk class, the main window
+        self.root = master_root                    # instantiate tk class, the main window
         self.root.wm_title("Embedding in TK")   # Window name
 
         self.fig = plt.figure()                 # creates figure instance
@@ -61,9 +61,7 @@ class App():
         ymax = 5 - average_Voltage
         self.ax.set_ylim([ymin,ymax])
         self.ax.grid
-        self.fig = function1(self.fig, self.ax)     # fills figure with data
-        
-            
+        self.fig = function1(self.fig, self.ax)     # fills figure with data  
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)  # No documentation, but a lot of matplot stuff have this.  Guessing it draws on it
         self.toolbar = NavigationToolbar2TkAgg( self.canvas, self.root )    # Toolbar for canvas
@@ -74,13 +72,6 @@ class App():
         self.label = tk.Label(text="")      # Makes empty label
         self.label.pack()                   # Adds it to the UI above the toolbar
         self.update_clock()                 # Calls clock update function
-        
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing())
-        self.root.mainloop()                # UI loop that blocks
-                                            # Subsitute of following
-                                            # while True:
-                                            #    tk.update_idletasks()
-                                            #    tk.update()
 
     def update_clock(self):
         self.fig = function1(self.fig,self.ax)      # updates fig instance with new fig
@@ -90,10 +81,7 @@ class App():
         self.label.configure(text=now)              # Updates time text
         self.root.after(10, self.update_clock)      # after 10ms, it runs update_clock again because it's now part of the mainloop update cycle
         
-    def on_closing(self):
-        if messagebox.askokcancel("Quit", "Do you want to quit?"):
-            arduino.close()
-            self.root.destroy()  
+    
 
 def function1(fig, ax):
     ax.cla()                                                            # Clear current axes
@@ -150,7 +138,10 @@ def Calibration_Zero_Average():
         dataArray[x] = data
     return Calculate_Average_Voltage(dataArray)
  
- 
+def on_closing():
+    if messagebox.askokcancel("Quit", "Do you want to quit?"):
+        arduino.close()
+        root.destroy()
 
 # rawdata = []
 # count = 0
@@ -179,4 +170,8 @@ def Calibration_Zero_Average():
 
     
 if __name__ == "__main__":
-    app = App()
+    root = tk.Tk()
+    app = App(root)
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.mainloop()
+    root.destroy()
