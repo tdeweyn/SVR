@@ -5,13 +5,17 @@ function to convert waveform to wav
 UI to start and stop recording of real time SVR
 UI to type in what was said
 LSTM-RNN
-Fix arduino not soft resetting when program connects: Use the IDE close, not
-the windows close button)
 @author: James
 '''
 # Rants to make me feel better
 # I swear I'm gonna go back to a C type language if I see another poorly documented python library.
 # Honestly anything with better documentation like JS and php.net.
+
+# Note to self, analyze code from here for wav
+# https://gist.github.com/Pretz/1773870 
+# RNN tutorial
+# https://github.com/mrubash1/RNN-Tutorial
+# https://svds.com/tensorflow-rnn-tutorial/
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -174,4 +178,4 @@ if __name__ == "__main__":
     app = App(root)
     root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
-    root.destroy()
+    # Putting arduino.close here and removing the protocal does not work
