@@ -1,7 +1,7 @@
 '''
 Created on Jan 7, 2018
 To do list:
-function to convert waveform to wav
+**Priority**function to convert waveform to wav
 UI to start and stop recording of real time SVR
 UI to type in what was said
 LSTM-RNN
@@ -16,6 +16,8 @@ LSTM-RNN
 # RNN tutorial
 # https://github.com/mrubash1/RNN-Tutorial
 # https://svds.com/tensorflow-rnn-tutorial/
+# should also check this
+# https://www.swharden.com/wp/2016-07-31-real-time-audio-monitor-with-pyqt/
 
 import matplotlib
 matplotlib.use('TkAgg')
