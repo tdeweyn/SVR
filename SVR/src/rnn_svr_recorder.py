@@ -2,7 +2,6 @@
 Created on Jan 7, 2018
 To do list:
 **Priority**function to convert waveform to wav
-UI to start and stop recording of real time SVR
 UI to type in what was said
 LSTM-RNN
 @author: James
@@ -19,26 +18,37 @@ LSTM-RNN
 # should also check this
 # https://www.swharden.com/wp/2016-07-31-real-time-audio-monitor-with-pyqt/
 
-import matplotlib
-matplotlib.use('TkAgg')
-
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 import random
-import numpy as np
-import sys
 import time
 from datetime import datetime
-import tkinter as tk        # tkinter is for python 3, Tkinter is for python 2.  Change if necessary
-                            # Seriously, how is this a thing?
-from tkinter import messagebox
 
 import serial
-from matplotlib import pyplot as plt
+import wave
+import struct
+import sys
+import csv, codecs, io
+import numpy as np
+from scipy.io import wavfile
+from scipy.signal import resample
 
-ydata = [0] * 100
-average_Voltage = 0;
+from PyQt5 import QtGui, QtCore
+from PyQt5.QtCore import QThread, QMutex
+from PyQt5.QtWidgets import (QApplication, QWidget, QMainWindow, QAction, qApp,
+                              QDesktopWidget, QPushButton, QToolTip, QMessageBox,
+                              QMenu, QTextEdit)
+
+import pyqtgraph
+import ui_main
+
+ydata = [0] * 1000
+dataHighSpeed = [0] * 1000
+average_Voltage = 0
+tempRecording = []
+mutex = QtCore.QMutex()
+completeMutex = QtCore.QMutex()
+recordingMutex = QtCore.QMutex()
+complete = False
+recording = False
 
 try:
     # Change the string to whatever serial port your Arduino is connected to on the bottom right corner in the Arduino sketch
@@ -47,63 +57,201 @@ except:
     print('Please check the port')
     sys.exit(1)
 
-# Freezing graph fix from
-# https://stackoverflow.com/questions/9999816/matplotlib-draw-freezes-window
-class App():
-    def __init__(self, master_root):
+class WavWriteThread(QtCore.QThread):
+    def __init__(self):
+        QThread.__init__(self)
+        self.exiting = False
+        
+    def __del__(self):
+        self.exiting = True
+        self.wait()
+    
+    def run(self, fname, fcount):
+        data = []
         
         
-        self.root = master_root                    # instantiate tk class, the main window
-        self.root.wm_title("Embedding in TK")   # Window name
+        for time, value in csv.reader(open(fname, 'U'), delimiter=','):
+            try:
+                data.append(float(value))#Here you can see that the time column is skipped
+            except ValueError:
+                pass # Just skip it
+    
+    
+        arr = np.array(data)#Just organize all your samples into an array
+        # Normalize data
+        arr /= np.max(np.abs(data)) #Divide all your samples by the max sample value
+        filename_head, extension = fname.rsplit(".", 1)        
+        data_resampled = resample( arr, len(data) )
+        wavfile.write("test%d.wav"%fcount, 1450, data_resampled) #resampling at 16khz
+        print ("File written succesfully !")
+        self.__del__()
 
-        self.fig = plt.figure()                 # creates figure instance
-        self.ax = self.fig.add_subplot(111)
-        self.ax.set_xlabel('X')         # adds axes labels, can't see them for some reason
-        self.ax.set_ylabel('Voltage')
-        
+
+class SerialReadThread(QtCore.QThread):
+    def __init__(self):
+        QThread.__init__(self)
+        self.exiting = False
+         
+            
+    def __del__(self):
+        completeMutex.lock()
+        global complete
+        complete = True
+        completeMutex.unlock()
+        self.exiting = True
+        self.wait()
+    
+    def run(self):
+        recordCount = 0
+        fileCount = 0
+        timeZero = 0
+        timeCurrent = 0
+        timeFromZero = 0
+        while True:
+            
+            t1=time.clock()
+            dummydata = arduino.readline()      # Debug variable to see serial data sent
+            data = dummydata.rstrip()
+            while Is_Number(data) != True:      # Necessary to check since first serial data sent is not always valid
+                dummydata = arduino.readline()
+                data = dummydata.rstrip()
+            data = float(data) * (5.0 / 1023.0) - average_Voltage
+            
+            mutex.lock()
+            global dataHighSpeed
+            dataHighSpeed.append(data)
+            del dataHighSpeed[0]
+            mutex.unlock()
+            
+            recordingMutex.lock()
+            if recording == True:
+                if recordCount == 0:
+                    recordCount += 1
+                    fileCount += 1
+                    timeZero = time.clock()
+                    timeCurrent = time.clock()
+                    timeFromZero = timeCurrent - timeZero
+                    tempRecording.append(data)
+                    f =  open("test%d.csv" %fileCount, "w", newline='\n')
+                    writer = csv.writer(f, csv.excel)
+                        
+                    row = [timeFromZero, data]
+                    writer.writerow(row)
+                else:
+                    recordCount += 1
+                    timeCurrent = time.clock()
+                    timeFromZero = timeCurrent - timeZero
+                    tempRecording.append(data)
+                    
+                    row = [timeFromZero, data]
+                    writer.writerow(row)
+            else:
+                if recordCount != 0:
+                    recordCount = 0
+                    timeZero = 0
+                    timeCurrent = 0
+                    timeFromZero = 0
+                    tempRecording.clear()
+                    f.close()
+                    self.wavThread = WavWriteThread()
+                    self.wavThread.run("test%d.csv" %fileCount, fileCount)
+                else:
+                    pass
+            recordingMutex.unlock()  
+            
+            print("update took %.03f ms"%((time.clock()-t1)*1000))
+            completeMutex.lock()
+            if complete == True:
+                completeMutex.unlock()
+                return
+            completeMutex.unlock()
+      
+class ExampleApp(QMainWindow, ui_main.Ui_MainWindow):
+    def __init__(self, parent=None):
         global average_Voltage
         average_Voltage = Calibration_Zero_Average()
-        ymin = 0 - average_Voltage
-        ymax = 5 - average_Voltage
-        self.ax.set_ylim([ymin,ymax])
-        self.ax.grid
-        self.fig = function1(self.fig, self.ax)     # fills figure with data  
-
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)  # No documentation, but a lot of matplot stuff have this.  Guessing it draws on it
-        self.toolbar = NavigationToolbar2TkAgg( self.canvas, self.root )    # Toolbar for canvas
-        self.toolbar.update()                                               # updates it                   
-        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)     # organizes widgets in blocks before placing in parent widget
-                                                                            # it acts on _tkcanvas because of some weird back end of matplotlib
-                                                                            # the dumpster fire
-        self.label = tk.Label(text="")      # Makes empty label
-        self.label.pack()                   # Adds it to the UI above the toolbar
-        self.update_clock()                 # Calls clock update function
-
-    def update_clock(self):
-        self.fig = function1(self.fig,self.ax)      # updates fig instance with new fig
-        self.canvas.show()                          # Refreshes canvas to show new fig
-        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)     # organizes widgets in blocks before placing in parent widget
-        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        self.label.configure(text=now)              # Updates time text
-        self.root.after(10, self.update_clock)      # after 10ms, it runs update_clock again because it's now part of the mainloop update cycle
+        self.thread = SerialReadThread()
+        self.thread.start()
         
-    
+        
+        
+        self.Y = [0] * 500
+        pyqtgraph.setConfigOption('background', 'w') #before loading widget
+        super(ExampleApp, self).__init__(parent)
+        self.setupUi(self)
+        self.btnAdd.clicked.connect(self.RecordToggle)
+        self.grPlot.plotItem.showGrid(True, True, 0.7)
+        self.update()
 
-def function1(fig, ax):
-    ax.cla()                                                            # Clear current axes
-    ax.set_xlabel('X')         # Need to set them again
-    ax.set_ylabel('Voltage')
-    dummydata = arduino.readline()      # Debug variable to see serial data sent
-    data = dummydata.rstrip()
-    while Is_Number(data) != True:      # Necessary to check since first serial data sent is not always valid
-        dummydata = arduino.readline()
-        data = dummydata.rstrip()
-    data = float(data) * (5.0 / 1023.0) - average_Voltage
-    global ydata
-    ydata.append(data)
-    del ydata[0]
-    ax.plot(ydata)
-    return fig
+    def update(self):
+        t1=time.clock()
+        points=500 #number of data points
+        X=np.arange(points)
+        mutex.lock()
+        self.Y.append(dataHighSpeed[999])
+        del self.Y[0]
+        mutex.unlock()
+        C=pyqtgraph.hsvColor(time.time()/5%1,alpha=.5)
+        pen=pyqtgraph.mkPen(color=C,width=10)
+        self.grPlot.plot(X,self.Y,pen=pen,clear=True)
+        #print("update took %.02f ms"%((time.clock()-t1)*1000))
+        #if self.chkMore.isChecked():
+        QtCore.QTimer.singleShot(1, self.update) # QUICKLY repeat 
+    
+    def RecordToggle(self):
+        recordingMutex.lock()
+        global recording
+        recording = not recording
+        if recording == True:
+            recordingMutex.unlock()
+            self.btnAdd.setText("Stop")
+        else:
+            recordingMutex.unlock()
+            self.btnAdd.setText("Record")
+            
+        
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self, 'Message',"Are you sure to quit?", 
+             QMessageBox.Yes |QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            self.thread.__del__()
+            arduino.close()
+            event.accept()
+        else:
+            event.ignore()   
+
+
+####################
+#    write_wave
+#    write wave function from
+#    https://stackoverflow.com/questions/41209733/csv-to-wav-python
+#    Author: Gab55
+#    Return: None
+####################
+def write_wav(data, filename, framerate, amplitude):
+    wavfile = wave.open(filename,'w')
+    nchannels = 1
+    sampwidth = 2
+    framerate = framerate
+    nframes = len(data)
+    comptype = "NONE"
+    compname = "not compressed"
+    wavfile.setparams((nchannels,
+                        sampwidth,
+                        framerate,
+                        nframes,
+                        comptype,
+                        compname))
+    frames = []
+    for s in data:
+        mul = int(s * amplitude)
+        frames.append(struct.pack('h', mul))
+
+    frames = ''.join(frames)
+    wavfile.writeframes(frames)
+    wavfile.close()
+    print("%s written" %(filename)) 
 
 ####################
 #    Is_Number
@@ -144,40 +292,11 @@ def Calibration_Zero_Average():
         dataArray[x] = data
     return Calculate_Average_Voltage(dataArray)
  
-def on_closing():
-    if messagebox.askokcancel("Quit", "Do you want to quit?"):
-        arduino.close()
-        root.destroy()
-
-# rawdata = []
-# count = 0
-# 
-# while count < 4:
-#     rawdata.append(str(arduino.readline()))
-#     count += 1
-# print(rawdata)
-# 
-# def clean(L):
-#     newl = []
-#     for i in range(len(L)):
-#         temp = L[i][2:]
-#         newl.append(temp[:-5])
-#     return newl
-# 
-# cleandata = clean(rawdata)
-# 
-# def write(L):
-#     file = open("data.txt", mode ='w')
-#     for i in range(len(L)):
-#         file.write(L[i] + '\n')
-#     file.close()
-# 
-# write(cleandata)
 
     
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.protocol("WM_DELETE_WINDOW", on_closing)
-    root.mainloop()
-    # Putting arduino.close here and removing the protocal does not work
+    app = QApplication(sys.argv)
+    form = ExampleApp()
+    form.show()
+    app.exec_()
+    print("DONE")
